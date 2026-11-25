@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>HTML Runner</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #fff; }
+    #app {
+      position: fixed; inset: 0;
+      width: 100%; height: 100%;
+      border: 0; display: block;
+    }
+    #msg {
+      font: 16px/1.5 system-ui, -apple-system, sans-serif;
+      padding: 24px; color: #333;
+    }
+    #msg a { color: #0a66c2; }
+  </style>
+</head>
+<body>
+  <script type="module">
+    import { getFile } from './store.js';
+
+    try {
+      const file = await getFile();
+      if (!file || typeof file.html !== 'string') {
+        location.replace('upload/');
+      } else {
+        const frame = document.createElement('iframe');
+        frame.id = 'app';
+        frame.title = file.name;
+        frame.allow = 'fullscreen; clipboard-read; clipboard-write; autoplay';
+        frame.allowFullscreen = true;
+        frame.srcdoc = file.html;
+        frame.addEventListener('load', () => {
+          // Mirror the uploaded page's <title> onto the tab.
+          let t = '';
+          try { t = frame.contentDocument.title; } catch (_) {}
+          document.title = t || file.name;
+        });
+        document.body.appendChild(frame);
+      }
+    } catch (err) {
+      document.body.innerHTML =
+        '<div id="msg"><p>Could not load the saved file: ' +
+        String(err && err.message || err).replace(/</g, '&lt;') +
+        '</p><p><a href="upload/">Go to upload page</a></p></div>';
+    }
+  </script>
+  <noscript><div id="msg">JavaScript is required.</div></noscript>
+</body>
+</html>

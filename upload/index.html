@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Upload · HTML Runner</title>
+  <style>
+    :root {
+      --bg: #f6f7f9; --card: #fff; --text: #1d2125; --muted: #626f86;
+      --line: #dcdfe4; --accent: #0a66c2; --accent-text: #fff; --danger: #c9372c;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #16181b; --card: #22272b; --text: #dee4ea; --muted: #9fadbc;
+        --line: #38414a; --accent: #579dff; --accent-text: #0b1220; --danger: #f87168;
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      background: var(--bg); color: var(--text);
+      font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+      padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom));
+    }
+    main { max-width: 480px; margin: 0 auto; }
+    h1 { font-size: 1.4rem; margin: 8px 0 4px; }
+    .sub { color: var(--muted); margin: 0 0 20px; font-size: .95rem; }
+    .card {
+      background: var(--card); border: 1px solid var(--line);
+      border-radius: 12px; padding: 16px; margin-bottom: 16px;
+    }
+    .drop {
+      border: 2px dashed var(--line); border-radius: 12px;
+      padding: 28px 16px; text-align: center;
+      transition: border-color .15s, background .15s;
+    }
+    body.dragging .drop { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-height: 48px; padding: 0 20px; border-radius: 10px;
+      font: inherit; font-weight: 600; text-decoration: none; cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .btn-primary { background: var(--accent); color: var(--accent-text); width: 100%; }
+    .btn-secondary { background: transparent; color: var(--text); border-color: var(--line); }
+    .btn-danger { background: transparent; color: var(--danger); border-color: var(--line); }
+    .hint { color: var(--muted); font-size: .85rem; margin: 10px 0 0; }
+    input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+    .label { color: var(--muted); font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; margin: 0 0 6px; }
+    .name { font-weight: 600; word-break: break-all; margin: 0; }
+    .meta { color: var(--muted); font-size: .875rem; margin: 2px 0 14px; }
+    .row { display: flex; gap: 10px; }
+    .row .btn { flex: 1; }
+    #status { min-height: 1.5em; font-size: .9rem; margin: 0 0 12px; }
+    #status.err { color: var(--danger); }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>HTML Runner</h1>
+    <p class="sub">Pick a single <code>.html</code> file. It's saved in this browser only, and opens at the site root.</p>
+
+    <p id="status" role="status"></p>
+
+    <section class="card">
+      <div class="drop">
+        <label class="btn btn-primary" for="file">Choose HTML file</label>
+        <input id="file" type="file" accept=".html,.htm,text/html">
+        <p class="hint">On a computer you can also drop a file anywhere on this page.</p>
+      </div>
+    </section>
+
+    <section class="card" id="current" hidden>
+      <p class="label">Currently saved</p>
+      <p class="name" id="cur-name"></p>
+      <p class="meta" id="cur-meta"></p>
+      <div class="row">
+        <a class="btn btn-secondary" href="../">Run</a>
+        <button class="btn btn-danger" id="clear" type="button">Clear</button>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { getFile, putFile, clearFile, requestPersist } from '../store.js';
+
+    const $ = (id) => document.getElementById(id);
+    const status = (text, isErr = false) => {
+      $('status').textContent = text;
+      $('status').className = isErr ? 'err' : '';
+    };
+
+    const fmtSize = (n) =>
+      n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) + ' KB' : (n / 1048576).toFixed(1) + ' MB';
+
+    async function showCurrent() {
+      try {
+        const f = await getFile();
+        if (!f) { $('current').hidden = true; return; }
+        $('cur-name').textContent = f.name;
+        $('cur-meta').textContent = fmtSize(f.size) + ' · saved ' + new Date(f.savedAt).toLocaleString();
+        $('current').hidden = false;
+      } catch (err) {
+        status('Storage unavailable: ' + (err && err.message || err), true);
+      }
+    }
+
+    async function save(file) {
+      if (!file) return;
+      const okName = /\.html?$/i.test(file.name);
+      const okType = file.type === 'text/html';
+      if (!okName && !okType) { status('That doesn’t look like an .html file.', true); return; }
+      status('Saving…');
+      try {
+        const html = await file.text();
+        await putFile({ name: file.name, size: file.size, savedAt: Date.now(), html });
+        requestPersist();
+        location.href = '../';
+      } catch (err) {
+        status('Could not save: ' + (err && err.message || err), true);
+      }
+    }
+
+    $('file').addEventListener('change', (e) => save(e.target.files[0]));
+
+    $('clear').addEventListener('click', async () => {
+      if (!confirm('Remove the saved file from this browser?')) return;
+      try { await clearFile(); status('Cleared.'); showCurrent(); }
+      catch (err) { status('Could not clear: ' + (err && err.message || err), true); }
+    });
+
+    // Drag and drop anywhere on the page (desktop).
+    let depth = 0;
+    addEventListener('dragenter', (e) => { e.preventDefault(); depth++; document.body.classList.add('dragging'); });
+    addEventListener('dragleave', () => { if (--depth <= 0) { depth = 0; document.body.classList.remove('dragging'); } });
+    addEventListener('dragover', (e) => e.preventDefault());
+    addEventListener('drop', (e) => {
+      e.preventDefault(); depth = 0; document.body.classList.remove('dragging');
+      save(e.dataTransfer.files[0]);
+    });
+
+    showCurrent();
+  </script>
+</body>
+</html>
