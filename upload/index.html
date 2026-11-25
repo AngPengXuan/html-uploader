@@ -72,18 +72,18 @@
     </section>
 
     <section class="card" id="current" hidden>
-      <p class="label">Currently saved</p>
+      <p class="label">This tab's file</p>
       <p class="name" id="cur-name"></p>
       <p class="meta" id="cur-meta"></p>
       <div class="row">
         <a class="btn btn-secondary" href="../">Run</a>
-        <button class="btn btn-danger" id="clear" type="button">Clear</button>
+        <button class="btn btn-danger" id="clear" type="button">Clear all</button>
       </div>
     </section>
   </main>
 
   <script type="module">
-    import { getFile, putFile, clearFile, requestPersist } from '../store.js';
+    import { getTabFile, addFile, clearAll, requestPersist } from '../store.js';
 
     const $ = (id) => document.getElementById(id);
     const status = (text, isErr = false) => {
@@ -96,7 +96,7 @@
 
     async function showCurrent() {
       try {
-        const f = await getFile();
+        const f = await getTabFile();
         if (!f) { $('current').hidden = true; return; }
         $('cur-name').textContent = f.name;
         $('cur-meta').textContent = fmtSize(f.size) + ' · saved ' + new Date(f.savedAt).toLocaleString();
@@ -114,7 +114,7 @@
       status('Saving…');
       try {
         const html = await file.text();
-        await putFile({ name: file.name, size: file.size, savedAt: Date.now(), html });
+        await addFile({ name: file.name, size: file.size, html });
         requestPersist();
         location.href = '../';
       } catch (err) {
@@ -125,8 +125,8 @@
     $('file').addEventListener('change', (e) => save(e.target.files[0]));
 
     $('clear').addEventListener('click', async () => {
-      if (!confirm('Remove the saved file from this browser?')) return;
-      try { await clearFile(); status('Cleared.'); showCurrent(); }
+      if (!confirm('Remove all saved files from this browser? Other open tabs will show the upload page on reload.')) return;
+      try { await clearAll(); status('Cleared.'); showCurrent(); }
       catch (err) { status('Could not clear: ' + (err && err.message || err), true); }
     });
 

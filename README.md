@@ -9,6 +9,12 @@ The file survives reloads and return visits. It is stored only in that browser o
 
 To change the file, go to `/upload/` in the address bar.
 
+## Multiple tabs
+
+Each tab remembers its own file (pointer in `sessionStorage`), so two tabs can run two different files and each reloads into its own. A new tab, or the browser reopened, gets the most recent upload. The last 5 uploads are kept; if a tab's file has been pushed out, it falls back to the latest.
+
+Files running at the same time share this site's storage (IndexedDB, localStorage). Two files that use the same database or key names will see each other's data.
+
 ## Limits
 
 - Single-file HTML only. Relative assets (`./style.css`, `img/x.png`) won't load; use inlined or CDN assets.

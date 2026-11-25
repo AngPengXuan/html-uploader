@@ -20,10 +20,10 @@
 </head>
 <body>
   <script type="module">
-    import { getFile } from './store.js';
+    import { getTabFile } from './store.js';
 
     try {
-      const file = await getFile();
+      const file = await getTabFile();
       if (!file || typeof file.html !== 'string') {
         location.replace('upload/');
       } else {
